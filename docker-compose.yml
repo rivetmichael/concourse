@@ -1,0 +1,49 @@
+version: '3'
+
+services:
+  concourse-db:
+    image: postgres
+    environment:
+    - POSTGRES_DB=concourse
+    - POSTGRES_PASSWORD=concourse_pass
+    - POSTGRES_USER=concourse_user
+    - PGDATA=/database
+
+  concourse:
+    image: concourse/concourse:4.2.1
+    command: quickstart
+    privileged: true
+    depends_on: [concourse-db]
+    environment:
+    - CONCOURSE_POSTGRES_HOST=concourse-db
+    - CONCOURSE_POSTGRES_USER=concourse_user
+    - CONCOURSE_POSTGRES_PASSWORD=concourse_pass
+    - CONCOURSE_POSTGRES_DATABASE=concourse
+    - CONCOURSE_EXTERNAL_URL
+    - CONCOURSE_ADD_LOCAL_USER=admin:admin
+    - CONCOURSE_MAIN_TEAM_LOCAL_USER=admin
+    labels:
+      - "traefik.frontend.rule=Host:concourse.local"
+      - "traefik.port=8080"
+      - "traefik.frontend.passHostHeader=true"
+
+  proxy:
+    image: traefik:alpine
+    container_name: traefik
+    restart: always
+    command: --api
+            --api.entrypoint=traefik
+            --api.dashboard=true
+            --docker
+            --docker.domain=local
+            --defaultEntryPoints='http'
+            --entryPoints='Name:http Address::80'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "traefik.backend=traefik"
+      - 'traefik.port=8080'
+      - 'traefik.frontend.rule=Host:traefik.local'
+    ports:
+      - "80:80"
+      - "443:443"
